@@ -1,0 +1,859 @@
+{
+  "id": "PentacoreCycle01",
+  "name": "Pentacore — Cycle (palier 1)",
+  "nodes": [
+    {
+      "id": "2f35c0d9-2d73-4166-a6b3-e2b79e6e09e3",
+      "name": "Tâche transmise (webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pentacore/drain",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Déclencheur : un commit de tâche (hook post-commit) ou tout appel HTTP lance le drain. Remplace `python -m pentacore --drain`.",
+      "notesInFlow": true,
+      "webhookId": "413eb583-e605-4475-ab78-c9b5a0acbdbc"
+    },
+    {
+      "id": "dea23c03-9423-44fc-af2e-02c5e074e061",
+      "name": "Lancement manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Déclencheur pour essayer depuis l'éditeur. Même chemin que le webhook.",
+      "notesInFlow": true
+    },
+    {
+      "id": "3504e827-6c24-4a85-a487-724d458d31f6",
+      "name": "Lire la queue",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "command": "=cd /depot && f=$(ls .agents/queue/task_*.md 2>/dev/null | head -n1); if [ -n \"$f\" ]; then printf '%s\\n' \"$f\"; cat \"$f\"; fi"
+      },
+      "notes": "Prend la première tâche de .agents/queue/ (photo de la queue). Remplace queue.scan.",
+      "notesInFlow": true
+    },
+    {
+      "id": "93e6f218-e697-410d-a2f2-b3eee094b220",
+      "name": "Parser la tâche",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Noeud « Parser la tâche » — remplace queue.parse + queue.validate de Pentacore.\n// Entrée : stdout de « Lire la queue » = \"<chemin>\\n<contenu>\" (vide si queue vide).\nconst stdout = ($input.first().json.stdout || '').replace(/\\r\\n/g, '\\n');\nif (!stdout.trim()) return [{ json: { vide: true, valide: false, motif: 'queue vide' } }];\n\nconst saut = stdout.indexOf('\\n');\nconst chemin = stdout.slice(0, saut).trim();\nconst contenu = stdout.slice(saut + 1);\n\nconst entete = (cle) => {\n  const m = contenu.match(new RegExp(`^${cle}\\\\s*:\\\\s*(.+)$`, 'mi'));\n  return m ? m[1].trim() : '';\n};\n// Une section court jusqu'au prochain ## BACK / ## UI seulement : les sous-titres\n// ## Contexte, ## Etape… appartiennent à la section (queue._SECTION_RE).\nconst section = (nom) => {\n  const re = /^##\\s+(BACK|UI)\\s*\\n([\\s\\S]*?)(?=^##\\s+(?:BACK|UI)\\s*\\n|$(?![\\s\\S]))/gm;\n  for (const m of contenu.matchAll(re)) if (m[1] === nom) return m[2].trim();\n  return '';\n};\n\nconst slugEntete = entete('slug');\nconst slug = slugEntete || chemin.split('/').pop().replace(/\\.md$/, '');\nconst back = section('BACK');\nconst demo = {};\nfor (const paire of entete('demo').split(',').filter(Boolean)) {\n  const [cle, valeur] = paire.split('=').map((s) => s.trim());\n  if (cle && valeur) demo[cle] = valeur;\n}\n\nlet motif = '';\nif (/^_\\s*\\(.*\\)\\s*_\\s*[.,;:!]*$/s.test(back)) motif = 'section ## BACK reduite a un placeholder « _(aucun …)_ »';\nelse if (!back) motif = 'pas de section ## BACK (le palier 1 ne traite que la boucle backend)';\nelse if (!slugEntete) motif = `pas d'en-tete \\`slug:\\` (cloturerait sur chore(${slug}))`;\nelse if (!/^[a-z0-9-]+$/.test(slug)) motif = `slug \\`${slug}\\` hors alphabet [a-z0-9-] (devient un tag git)`;\n\nreturn [{ json: { vide: false, valide: !motif, motif, chemin, slug, back, demo } }];\n"
+      },
+      "notes": "Lit slug, bloc ## BACK et en-tête demo:, et valide la tâche. Remplace queue.parse + queue.validate.",
+      "notesInFlow": true
+    },
+    {
+      "id": "04d344f2-4c4d-457d-ae56-9ffe5adb55a3",
+      "name": "Queue vide ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "eb59bec1-3eb7-44a0-a446-6c2cfa9ac35d",
+              "leftValue": "={{ $json.vide }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "Rien à faire si la queue est vide : fin propre, sans HALT.",
+      "notesInFlow": true
+    },
+    {
+      "id": "12520418-59a3-4891-a42c-631e9d79de54",
+      "name": "Rien à faire",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        960,
+        -60
+      ],
+      "parameters": {},
+      "notes": "Queue vide : le drain se termine (état done).",
+      "notesInFlow": true
+    },
+    {
+      "id": "d3502fd5-b8f6-4a6c-a3d0-3e0bf1ea1c54",
+      "name": "Tâche valide ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5762630b-99e9-488d-a6cd-1b12e735169e",
+              "leftValue": "={{ $json.valide }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "Pre-flight du drain : une tâche malformée bloque avant de lancer un agent.",
+      "notesInFlow": true
+    },
+    {
+      "id": "89b2a7a7-31a7-49f5-af57-d1f31e20a3f5",
+      "name": "HALT pre-flight",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "errorMessage": "=HALT|{{ $json.slug }}|-|pre-flight : {{ $json.motif }}"
+      },
+      "notes": "Gate déterministe refusée → l'exécution échoue et le workflow HALT rédige le rapport. Remplace l'état « refused ».",
+      "notesInFlow": true
+    },
+    {
+      "id": "d07a549e-2064-495f-a540-4e386180c69a",
+      "name": "Lire l'arbre",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        100
+      ],
+      "parameters": {
+        "command": "=cd /depot && git status --porcelain --untracked-files=all"
+      },
+      "notes": "État du working tree avant le cycle.",
+      "notesInFlow": true
+    },
+    {
+      "id": "1bfb1c98-9997-44c2-ae3a-ff89cb02f06d",
+      "name": "Arbre propre ?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Noeud « Arbre propre ? » — remplace git_safety.has_changes(ignore=TASK_FILES_RELATIVE).\n// Entrée : stdout de `git status --porcelain --untracked-files=all`.\nconst IGNORES = ['.agents/queue/', '.agents/runs/'];\nconst residu = ($input.first().json.stdout || '')\n  .split('\\n')\n  .filter((ligne) => ligne.trim())\n  .map((ligne) => ligne.slice(3).trim())\n  .filter((chemin) => !IGNORES.some((d) => chemin.startsWith(d)));\nreturn [{ json: { propre: residu.length === 0, residu } }];\n"
+      },
+      "notes": "Ignore .agents/queue/ et .agents/runs/, liste le reste. Remplace git_safety.has_changes.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a30ad8fc-6c8f-4340-a039-af3045e76d1c",
+      "name": "Arbre propre",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "058a7d9c-0690-4132-afdf-03069987e8e1",
+              "leftValue": "={{ $json.propre }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "Pre-check : on ne démarre jamais sur un arbre sale (sûreté du tag de restauration).",
+      "notesInFlow": true
+    },
+    {
+      "id": "f21bd576-365f-41ca-a695-e3be54099ed1",
+      "name": "HALT arbre sale",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "errorMessage": "=HALT|{{ $('Parser la tâche').first().json.slug }}|-|working tree non propre : {{ $json.residu.join(', ') }}"
+      },
+      "notes": "Cycle annulé : du travail non commité traîne. Rien n'est touché.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a64d18b9-25a1-4943-a1ea-dc34b3f0075a",
+      "name": "Poser le tag",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        100
+      ],
+      "parameters": {
+        "command": "=cd /depot && t=auto-backup-{{ $('Parser la tâche').first().json.slug }}-$(date +%Y-%m-%d-%H%M%S) && git tag -a \"$t\" -m \"Pentacore run {{ $('Parser la tâche').first().json.slug }}\" && echo \"$t\" && git rev-parse \"$t^{commit}\""
+      },
+      "notes": "Tag de restauration auto-backup-<slug>-<horodatage> + base résolue. Remplace git_safety.place_restore_tag.",
+      "notesInFlow": true
+    },
+    {
+      "id": "e0eedde1-c3fe-4d4a-a5e5-8167b6b6b93e",
+      "name": "Première tentative",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2160,
+        100
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a8ebdee1-729e-4d81-a0bb-ae34ab6db6b5",
+              "name": "tentative",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "be483b3a-e7af-49ac-ad46-23a13c725541",
+              "name": "constats",
+              "value": "={{ [] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Tentative 1, aucun constat. La boucle de retour repart d'ici avec tentative 2.",
+      "notesInFlow": true
+    },
+    {
+      "id": "9d2b425f-fc7f-4482-ac38-d61e8ab90947",
+      "name": "Préparer le contexte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Noeud « Préparer le contexte » — remplace orchestrator._contexte_cycle et\n// _message_dispatch : le moteur prépare tout ce que l'agent doit savoir, l'agent\n// ne reconstruit rien et n'écrit QUE son rapport, au chemin désigné.\nconst tache = $('Parser la tâche').first().json;\nconst [tag, base] = ($('Poser le tag').first().json.stdout || '').trim().split('\\n');\nconst etat = $input.first().json;\nconst tentative = Number(etat.tentative || 1);\nconst constats = etat.constats || [];\nconst stage = 'backend-lead';\n\nconst horodatage = () => {\n  const d = new Date();\n  const p = (n) => String(n).padStart(2, '0');\n  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;\n};\nconst jeton = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0');\nconst run_id = etat.run_id || `${tache.slug}-${horodatage()}-${jeton()}`;\n\nconst dossier = `.agents/runs/${run_id}`;\nconst chemin_contexte = `${dossier}/${stage}.context.json`;\nconst chemin_rapport = `${dossier}/${stage}.report.json`;\n\nconst contexte = {\n  run: run_id, stage, tentative, slug: tache.slug,\n  tache: { fichier: tache.chemin, slug: tache.slug, bloc: '## BACK', contenu: tache.back },\n  perimetre: { tag, base, plage: `${base}..HEAD` },\n  constats_ouverts: constats,\n  rapports_pertinents: [],\n  preuves_valides: [],\n  rapport: {\n    chemin: chemin_rapport, format: 'json',\n    champs: ['run', 'stage', 'tentative', 'statut', 'resume', 'changements',\n      'verifications', 'preuves', 'constats_ouverts', 'decisions'],\n  },\n};\nif (tentative > 1) {\n  contexte.reprise = true;\n  contexte.constats_a_reprendre = constats;\n}\n\nconst corps = tentative > 1\n  ? `REPRISE CIBLEE du cycle \\`${tache.slug}\\` : corrige UNIQUEMENT les constats listes dans `\n    + '`constats_a_reprendre` de ton contexte — chacun porte sa preuve. Le travail deja livre est '\n    + 'conserve : ne refais pas la tache, ne revois pas les choix actes.'\n  : `C'est LA tache dispatchee pour ce cycle (\\`${tache.slug}\\`, bloc ## BACK) : ne va pas en `\n    + \"chercher une autre dans la queue — ton contexte contient deja le bon bloc.\";\nconst message = [\n  `Contexte prepare : ${chemin_contexte}`,\n  \"Lis-le d'abord : il contient ta tache exacte, ton perimetre Git resolu et le chemin EXACT de ton rapport.\",\n  corps,\n  `RAPPORT (OBLIGATOIRE) : ecris ton rapport dans \\`${chemin_rapport}\\` (JSON). Recopie \\`run\\`, `\n    + `\\`stage\\` et \\`tentative\\` (= ${tentative}) depuis ton contexte ; renseigne \\`statut\\` `\n    + '(\"ok\", \"partiel\" ou \"bloque\"), `resume` (1-3 phrases), puis `changements`, `verifications`, '\n    + '`preuves`, `constats_ouverts`, `decisions`. Sans rapport valide, ton stage est refuse.',\n].join('\\n');\n\nconst b64 = (texte) => Buffer.from(texte, 'utf8').toString('base64');\nreturn [{ json: {\n  run_id, tentative, constats, stage,\n  slug: tache.slug, tag,\n  comportement: tache.demo?.[`${stage}#${tentative}`] || 'vrai',\n  chemin_contexte,\n  contexte_b64: b64(JSON.stringify(contexte, null, 2)),\n  message_b64: b64(message),\n} }];\n"
+      },
+      "notes": "Contexte préparé JSON + message de lancement : tâche exacte, plage Git résolue, chemin du rapport. Remplace orchestrator._contexte_cycle.",
+      "notesInFlow": true
+    },
+    {
+      "id": "1b0c9c8d-1585-4d1d-ae7e-6dec1e6d484f",
+      "name": "Écrire le contexte",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2640,
+        100
+      ],
+      "parameters": {
+        "command": "=cd /depot && mkdir -p .agents/runs/{{ $json.run_id }} && echo '{{ $json.contexte_b64 }}' | base64 -d > {{ $json.chemin_contexte }} && echo '{{ $json.message_b64 }}' | base64 -d > {{ $json.chemin_contexte }}.message.txt && echo ok"
+      },
+      "notes": "Dépose le contexte dans .agents/runs/<run_id>/ : l'agent le lit, il ne reconstruit rien.",
+      "notesInFlow": true
+    },
+    {
+      "id": "da64b877-4062-4ebb-a0a5-3fee3ef83533",
+      "name": "Backend Lead",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2880,
+        100
+      ],
+      "parameters": {
+        "command": "=sh /moteur/lancer-agent.sh {{ $('Préparer le contexte').first().json.stage }} {{ $('Préparer le contexte').first().json.tentative }} {{ $('Préparer le contexte').first().json.run_id }} {{ $('Préparer le contexte').first().json.comportement }} {{ $('Préparer le contexte').first().json.chemin_contexte }}"
+      },
+      "notes": "Agent de code (Kilo, ou agent scripté en mode démo), borné par timeout. Remplace stage_runner.run_stage.",
+      "notesInFlow": true
+    },
+    {
+      "id": "b13d8a92-8f82-4e44-a123-eb1a540ef4f9",
+      "name": "Agent sorti en 0 ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3120,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "12ba73bc-0c85-4621-a644-70e1664965ef",
+              "leftValue": "={{ /__exit=0\\s*$/.test($json.stdout) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "Lit le code de sortie imprimé par le lanceur. La chaîne d'escalade (repli, Doctor) arrive au palier 4.",
+      "notesInFlow": true
+    },
+    {
+      "id": "1518fc18-b3f0-4af5-aab2-c4beb778c7a0",
+      "name": "HALT agent en échec",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        300
+      ],
+      "parameters": {
+        "errorMessage": "=HALT|{{ $('Préparer le contexte').first().json.slug }}|{{ $('Préparer le contexte').first().json.tag }}|backend-lead en echec (tentative {{ $('Préparer le contexte').first().json.tentative }})"
+      },
+      "notes": "Palier 1 : un agent en échec fait HALT directement.",
+      "notesInFlow": true
+    },
+    {
+      "id": "202435e6-bb75-4663-ab45-ee3e82f2b24b",
+      "name": "Commit des restes du Lead",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        100
+      ],
+      "parameters": {
+        "command": "=cd /depot && git add -A && (git commit -q -m \"chore({{ $('Préparer le contexte').first().json.slug }}): restes du backend-lead avant gates\" && echo commit || echo rien)"
+      },
+      "notes": "Commite ce que le Lead a laissé, pour que la gate et l'humain voient le livrable. Remplace commit_all « restes du Lead ».",
+      "notesInFlow": true
+    },
+    {
+      "id": "2b3aadc6-04f7-4bd0-ae48-7a7e26995c24",
+      "name": "Diff depuis le tag",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        100
+      ],
+      "parameters": {
+        "command": "=cd /depot && git diff {{ $('Préparer le contexte').first().json.tag }} -- . ':(exclude).agents'; echo __UNTRACKED__; git ls-files --others --exclude-standard -- . ':(exclude).agents' | while read f; do echo \"__FICHIER__ $f\"; cat \"$f\"; done"
+      },
+      "notes": "Tout ce que le cycle a ajouté depuis le tag (suivi + non suivi). Les gates jugent le diff, pas la parole de l'agent.",
+      "notesInFlow": true
+    },
+    {
+      "id": "2539b3dc-ae22-4e3a-ab5e-1ce6a139848e",
+      "name": "skip_gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Noeud « skip_gate » — remplace pentacore/skip_gate.py, sans modèle.\n// Entrée : stdout = `git diff <tag>` puis \"__UNTRACKED__\" et, pour chaque\n// fichier non suivi, \"__FICHIER__ <chemin>\" suivi de son contenu.\n// Ne regarde que les lignes AJOUTÉES ; un skip est justifié par le marqueur\n// `pentacore-skip-ok:` sur la même ligne ou la ligne juste au-dessus.\nconst MOTIFS = [\n  /\\b(it|test|describe)\\.skip\\(/,\n  /\\b(it|test|describe)\\.only\\(/,\n  /\\b(xit|xtest|xdescribe)\\(/,\n  /@pytest\\.mark\\.skip\\b/,\n  /@pytest\\.mark\\.skipif\\b/,\n  /\\bpytest\\.skip\\(/,\n  /@unittest\\.skip\\b/,\n];\nconst JUSTIFICATION = 'pentacore-skip-ok';\n\nconst sortie = ($input.first().json.stdout || '').replace(/\\r\\n/g, '\\n');\nconst [diff, nonSuivis = ''] = sortie.split('__UNTRACKED__\\n');\n\n// fichier -> [{ ligne, texte }] des lignes ajoutées, numérotées dans le nouveau fichier.\nconst ajouts = {};\nlet courant = null;\nlet numero = 0;\nfor (const ligne of diff.split('\\n')) {\n  if (ligne.startsWith('+++ ')) {\n    const p = ligne.slice(4).trim();\n    courant = p.startsWith('b/') ? p.slice(2) : null;\n    if (courant) ajouts[courant] = ajouts[courant] || [];\n    continue;\n  }\n  const hunk = ligne.match(/^@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@/);\n  if (hunk) { numero = Number(hunk[1]); continue; }\n  if (!courant) continue;\n  if (ligne.startsWith('+')) { ajouts[courant].push({ ligne: numero, texte: ligne.slice(1) }); numero += 1; }\n  else if (ligne.startsWith(' ')) numero += 1;\n}\nlet fichier = null;\nfor (const ligne of nonSuivis.split('\\n')) {\n  const entete = ligne.match(/^__FICHIER__ (.+)$/);\n  if (entete) { fichier = entete[1].trim(); ajouts[fichier] = []; continue; }\n  if (fichier) ajouts[fichier].push({ ligne: ajouts[fichier].length + 1, texte: ligne });\n}\n\nconst constats = [];\nfor (const [chemin, lignes] of Object.entries(ajouts)) {\n  lignes.forEach(({ ligne, texte }, i) => {\n    if (!MOTIFS.some((m) => m.test(texte))) return;\n    const precedente = i > 0 && lignes[i - 1].ligne === ligne - 1 ? lignes[i - 1].texte : '';\n    if (texte.includes(JUSTIFICATION) || precedente.includes(JUSTIFICATION)) return;\n    constats.push({ fichier: chemin, ligne, texte: texte.trim() });\n  });\n}\n\nreturn [{ json: {\n  ok: constats.length === 0,\n  constats,\n  rapport: constats.length ? `${constats.length} skip(s) non justifie(s)` : 'aucun skip non justifie',\n} }];\n"
+      },
+      "notes": "Gate déterministe sans modèle : test désactivé (skip/only) sans `pentacore-skip-ok:` → constat avec fichier:ligne. Remplace skip_gate.py.",
+      "notesInFlow": true
+    },
+    {
+      "id": "aea20ba4-655f-4583-a611-ab78786e3b6d",
+      "name": "Gate verte ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4080,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "10cdedc6-d834-4de7-aab6-931d42b9e754",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "Verdict de la gate : vert → clôture du cycle ; rouge → retour au Lead si le budget le permet.",
+      "notesInFlow": true
+    },
+    {
+      "id": "15b3dca6-92e6-4ae1-a569-ba9bbe336fed",
+      "name": "Clore le cycle",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4320,
+        -60
+      ],
+      "parameters": {
+        "command": "=cd /depot && mkdir -p .agents/queue/done && git mv {{ $('Parser la tâche').first().json.chemin }} .agents/queue/done/ && git add -A && git commit -q -m \"chore({{ $('Parser la tâche').first().json.slug }}): cycle queue termine\" && git log --oneline -1"
+      },
+      "notes": "Tâche déplacée dans done/ + commit de clôture chore(<slug>): cycle queue termine (borne des revues futures).",
+      "notesInFlow": true
+    },
+    {
+      "id": "8850e8dc-be84-47b1-acae-364b149a6508",
+      "name": "Cycle terminé",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4560,
+        -60
+      ],
+      "parameters": {},
+      "notes": "Cycle vert. Paliers suivants : Reviewer, 4 gates, Global Reviewer, coutures.",
+      "notesInFlow": true
+    },
+    {
+      "id": "7f33b18c-dbaf-4d75-ab05-c7bda23767ab",
+      "name": "Retour disponible ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4320,
+        260
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bd64e6ed-ac0a-4a0e-a873-be9ff50db065",
+              "leftValue": "={{ $('Préparer le contexte').first().json.tentative < 2 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "Budget de retour : 1 seul renvoi au Lead (reprises.max_par_cycle = 1 dans Pentacore). Garantit la terminaison.",
+      "notesInFlow": true
+    },
+    {
+      "id": "99cf76b0-0a2a-4970-aa65-f84ed1239a34",
+      "name": "Préparer le retour",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4560,
+        160
+      ],
+      "parameters": {
+        "jsCode": "// Noeud « Préparer le retour » — version palier 1 de la reprise ciblée\n// (orchestrator.run_reprise_ciblee) : le Lead reçoit les constats précis de la\n// gate, avec leur preuve (fichier:ligne), et une tentative de plus.\nconst precedent = $('Préparer le contexte').first().json;\nconst constats = $input.first().json.constats.map(\n  (c) => `skip_gate : ${c.fichier}:${c.ligne} : ${c.texte} — test desactive sans \\`pentacore-skip-ok: <raison>\\``);\nreturn [{ json: { tentative: precedent.tentative + 1, run_id: precedent.run_id, constats } }];\n"
+      },
+      "notes": "Constats avec leur preuve (fichier:ligne) pour le Lead, tentative + 1. Version palier 1 de la reprise ciblée.",
+      "notesInFlow": true
+    },
+    {
+      "id": "f9e7256c-338a-4483-afc5-030983191937",
+      "name": "HALT skip_gate",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        4560,
+        420
+      ],
+      "parameters": {
+        "errorMessage": "=HALT|{{ $('Préparer le contexte').first().json.slug }}|{{ $('Préparer le contexte').first().json.tag }}|skip_gate rouge apres retour : {{ $('skip_gate').first().json.constats.map(c => c.fichier + ':' + c.ligne).join(', ') }}"
+      },
+      "notes": "Budget épuisé et preuve toujours rouge : HALT. Rien n'est défait, le rapport liste tout pour l'humain.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Tâche transmise (webhook)": {
+      "main": [
+        [
+          {
+            "node": "Lire la queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lancement manuel": {
+      "main": [
+        [
+          {
+            "node": "Lire la queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire la queue": {
+      "main": [
+        [
+          {
+            "node": "Parser la tâche",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser la tâche": {
+      "main": [
+        [
+          {
+            "node": "Queue vide ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue vide ?": {
+      "main": [
+        [
+          {
+            "node": "Rien à faire",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tâche valide ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tâche valide ?": {
+      "main": [
+        [
+          {
+            "node": "Lire l'arbre",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HALT pre-flight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire l'arbre": {
+      "main": [
+        [
+          {
+            "node": "Arbre propre ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arbre propre ?": {
+      "main": [
+        [
+          {
+            "node": "Arbre propre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arbre propre": {
+      "main": [
+        [
+          {
+            "node": "Poser le tag",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HALT arbre sale",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poser le tag": {
+      "main": [
+        [
+          {
+            "node": "Première tentative",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Première tentative": {
+      "main": [
+        [
+          {
+            "node": "Préparer le contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer le contexte": {
+      "main": [
+        [
+          {
+            "node": "Écrire le contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire le contexte": {
+      "main": [
+        [
+          {
+            "node": "Backend Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend Lead": {
+      "main": [
+        [
+          {
+            "node": "Agent sorti en 0 ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent sorti en 0 ?": {
+      "main": [
+        [
+          {
+            "node": "Commit des restes du Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HALT agent en échec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit des restes du Lead": {
+      "main": [
+        [
+          {
+            "node": "Diff depuis le tag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Diff depuis le tag": {
+      "main": [
+        [
+          {
+            "node": "skip_gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "skip_gate": {
+      "main": [
+        [
+          {
+            "node": "Gate verte ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate verte ?": {
+      "main": [
+        [
+          {
+            "node": "Clore le cycle",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retour disponible ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clore le cycle": {
+      "main": [
+        [
+          {
+            "node": "Cycle terminé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retour disponible ?": {
+      "main": [
+        [
+          {
+            "node": "Préparer le retour",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HALT skip_gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer le retour": {
+      "main": [
+        [
+          {
+            "node": "Préparer le contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "PentacoreHalt001",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {}
+}
