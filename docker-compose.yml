@@ -1,0 +1,33 @@
+services:
+  n8n:
+    build: ./docker
+    image: pentacore-n8n:2.44.6
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      GENERIC_TIMEZONE: Europe/Brussels
+      TZ: Europe/Brussels
+      # Execute Command est desactive par defaut depuis n8n 2.0 : on le
+      # reactive (les agents sont des CLI), Local File Trigger reste exclu.
+      NODES_EXCLUDE: '["n8n-nodes-base.localFileTrigger"]'
+      N8N_RESTRICT_FILE_ACCESS_TO: /depot;/journaux
+      # Marque les commits faits par le moteur : le hook post-commit du depot
+      # jouet ne relance pas de drain pour eux.
+      PENTACORE_MOTEUR: "1"
+      PENTACORE_MODELE: ${PENTACORE_MODELE:-openrouter/~deepseek/deepseek-flash-latest}
+      PENTACORE_DUREE_MAX_S: ${PENTACORE_DUREE_MAX_S:-2700}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_SECURE_COOKIE: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./depot-demo:/depot
+      - ./moteur:/moteur:ro
+      - ./journaux:/journaux
+      - ./workflows:/workflows:ro
+
+volumes:
+  n8n_data:
