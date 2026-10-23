@@ -1,9 +1,21 @@
 # Pentacore dans n8n
 
+> **In English.** Pentacore is a Python orchestrator I built and use to run coding agents
+> on a real Git repository and check what they deliver *mechanically*, instead of taking
+> their word for it. This repository rebuilds one Pentacore cycle as n8n workflows
+> (n8n 2.44.6, local Docker): a Git hook triggers the cycle, a coding agent implements the
+> task, a model-free `skip_gate` reads the diff and catches a disabled test, sends the
+> evidence (`file:line`) back to the agent once, then halts with a report if it cheats again.
+> In the demo the agent is **scripted** so that the cheat happens every time; the real
+> agent path (Kilo CLI + OpenRouter) is wired but not yet run. Four scenarios are covered by
+> an automated acceptance test (`bash scripts/recette.sh tout`). The rest of this README is
+> in French. Source-available under the PolyForm Noncommercial License 1.0.0 (see
+> [LICENSE.md](LICENSE.md)); the production prompts and the full engine are not published.
+
 **Un orchestrateur d'agents de code qui ne croit pas les agents sur parole,
 reconstruit dans n8n.**
 
-[Pentacore](docs/01-carte-pentacore.md) est un orchestrateur Python que j'ai
+Pentacore est un orchestrateur Python que j'ai
 conçu et que j'utilise : il enchaîne des agents IA de développement (Lead,
 Reviewer, Global Reviewer, Seam Reviewer, Doctor) sur un vrai dépôt Git, et
 **contrôle mécaniquement** ce qu'ils livrent. Gates déterministes, rapports
@@ -109,9 +121,7 @@ Hook post-commit ──► Webhook n8n ──► Pentacore — Cycle ──► E
 
 ## Feuille de route
 
-Seul le palier 1 est construit. Les suivants sont conçus
-([conception](docs/superpowers/specs/2026-10-23-pentacore-n8n-v1-design.md))
-mais pas encore réalisés.
+Seul le palier 1 est construit. Les suivants sont conçus mais pas encore réalisés.
 
 | Palier | Contenu | État |
 |---|---|---|
@@ -130,7 +140,11 @@ $PENTACORE_MODELE`) mais n'est pas encore éprouvé.
 
 ## Pour aller plus loin
 
-- [01 — Carte de Pentacore](docs/01-carte-pentacore.md) : étapes, gates, boucles, état, citées au fichier et à la ligne.
 - [02 — Correspondance Pentacore → n8n](docs/02-correspondance.md) : concept par concept, classé direct / contournement / à perdre, sourcé sur docs.n8n.io.
 - [Déroulé de la démo](docs/demo-recruteur.md) : le script des 5 minutes et les questions probables.
-- [Conception de la V1](docs/superpowers/specs/2026-10-23-pentacore-n8n-v1-design.md) et [plan du palier 1](docs/superpowers/plans/2026-10-23-palier-1-livraison-du-soir.md).
+
+## Licence
+
+Code source disponible sous [PolyForm Noncommercial 1.0.0](LICENSE.md) : lecture, essai et
+usage non commercial autorisés ; tout usage commercial demande une licence séparée de
+l'auteur. Les prompts de production et le moteur complet de Pentacore ne sont pas publiés.

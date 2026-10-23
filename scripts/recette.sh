@@ -21,7 +21,14 @@ committer_tache() {  # le hook post-commit transmet la tâche à n8n
 
 attendre_issue() {  # attendre_issue <secondes> -> imprime done | halt | rien
   for _ in $(seq 1 $(( $1 / 2 ))); do
-    [ -f depot-demo/.agents/queue/done/task_001.md ] && { echo done; return; }
+    if [ -f depot-demo/.agents/queue/done/task_001.md ]; then
+      # `git mv` vers done/ précède le commit de clôture : on attend ce commit.
+      for _ in $(seq 1 10); do
+        git -C depot-demo log --oneline -1 | grep -q "cycle queue termine" && break
+        sleep 1
+      done
+      echo done; return
+    fi
     ls journaux/halt-*.md >/dev/null 2>&1 && { sleep 1; echo halt; return; }
     sleep 2
   done

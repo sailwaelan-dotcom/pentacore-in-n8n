@@ -1,7 +1,7 @@
 # 02 — Correspondance Pentacore → n8n
 
 Livrable de la phase 2. Il part de la carte validée
-([01-carte-pentacore.md](01-carte-pentacore.md)) et cherche, pour chaque
+(carte du moteur, non publiée) et cherche, pour chaque
 concept, son équivalent dans n8n.
 
 ## Conventions

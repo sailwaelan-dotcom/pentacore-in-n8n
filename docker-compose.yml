@@ -4,7 +4,8 @@ services:
     image: pentacore-n8n:2.44.6
     restart: unless-stopped
     ports:
-      - "5678:5678"
+      # Local uniquement : Execute Command est actif, ne pas exposer sur le reseau.
+      - "127.0.0.1:5678:5678"
     env_file:
       - path: .env
         required: false
