@@ -170,6 +170,24 @@ canal, et rendre le flux lisible par quelqu'un qui ne lit pas de Python.
 5. **Candidature n8n** : le projet sert-il de démonstration ? Cela change la
    finition et ce qu'il faut montrer.
 
+## Décisions de Souhail (2026-10-23)
+
+| Question | Décision |
+|---|---|
+| Hébergement | **n8n en local avec Docker** |
+| Architecture | **A** : n8n orchestre et contrôle, l'agent de code reste un CLI lancé par Execute Command |
+| Fournisseur de LLM | **OpenRouter** |
+| Candidature n8n | **Oui** : le projet sert de démonstration, la finition doit en tenir compte |
+| Périmètre de la V1 | Proposition de la section 4 (point 3), à arrêter pendant la conception (phase 3) |
+
+Conséquences à traiter en phase 3 :
+
+- Activer Execute Command (`NODES_EXCLUDE`, S13) et ouvrir l'accès aux
+  fichiers du dépôt monté (`N8N_RESTRICT_FILE_ACCESS_TO`, S10).
+- [À vérifier] Le CLI d'agent retenu doit accepter OpenRouter comme
+  fournisseur, et n8n doit offrir un nœud de modèle OpenRouter pour le
+  Reviewer.
+
 ## [À vérifier]
 
 1. **Enable Fallback Model sur le nœud AI Agent principal.** La doc officielle
