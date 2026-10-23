@@ -1,0 +1,11 @@
+#!/bin/sh
+# Hook du depot jouet : un commit qui ajoute une tache dans la queue declenche
+# le drain n8n. Les commits du moteur (PENTACORE_MOTEUR=1, pose dans le
+# conteneur) sont ignores : les taches qu'il ajoute attendent le drain suivant.
+[ "$PENTACORE_MOTEUR" = "1" ] && exit 0
+if git diff-tree --no-commit-id --name-only --diff-filter=A -r HEAD | grep -q '^\.agents/queue/task_.*\.md$'; then
+  curl -s -X POST -H 'Content-Type: application/json' -d '{"source":"post-commit"}' \
+    http://localhost:5678/webhook/pentacore/drain >/dev/null 2>&1 &
+  echo "[pentacore] tache transmise a n8n"
+fi
+exit 0
