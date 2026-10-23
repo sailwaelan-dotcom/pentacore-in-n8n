@@ -35,7 +35,7 @@ verifier() {  # verifier <libelle> <condition shell>
 scenario_triche_puis_honnete() {
   echo "== triche-puis-honnete"
   ecrire_tache "$tmp/t.md" "backend-lead#1=triche-skip,backend-lead#2=honnete"
-  bash scripts/reset-depot.sh --tache "$tmp/t.md" >/dev/null
+  rm -rf journaux/*; bash scripts/reset-depot.sh --tache "$tmp/t.md" >/dev/null
   committer_tache
   local issue; issue=$(attendre_issue 180)
   verifier "cycle clos (tache dans done/)" '[ "$issue" = done ]'
@@ -49,7 +49,7 @@ scenario_triche_puis_honnete() {
 scenario_triche_deux_fois() {
   echo "== triche-deux-fois"
   ecrire_tache "$tmp/t.md" "backend-lead#1=triche-skip,backend-lead#2=triche-skip"
-  bash scripts/reset-depot.sh --tache "$tmp/t.md" >/dev/null
+  rm -rf journaux/*; bash scripts/reset-depot.sh --tache "$tmp/t.md" >/dev/null
   committer_tache
   local issue; issue=$(attendre_issue 180)
   verifier "HALT" '[ "$issue" = halt ]'
@@ -62,7 +62,7 @@ scenario_triche_deux_fois() {
 scenario_tache_malformee() {
   echo "== tache-malformee"
   ecrire_tache "$tmp/t.md" "" sans-slug
-  bash scripts/reset-depot.sh --tache "$tmp/t.md" >/dev/null
+  rm -rf journaux/*; bash scripts/reset-depot.sh --tache "$tmp/t.md" >/dev/null
   committer_tache
   local issue; issue=$(attendre_issue 60)
   verifier "HALT" '[ "$issue" = halt ]'
@@ -72,7 +72,7 @@ scenario_tache_malformee() {
 
 scenario_queue_vide() {
   echo "== queue-vide"
-  bash scripts/reset-depot.sh >/dev/null
+  rm -rf journaux/*; bash scripts/reset-depot.sh >/dev/null
   curl -s -X POST http://localhost:5678/webhook/pentacore/drain >/dev/null
   local issue; issue=$(attendre_issue 20)
   verifier "ni HALT ni cloture" '[ "$issue" = rien ]'

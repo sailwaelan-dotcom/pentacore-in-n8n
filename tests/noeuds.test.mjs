@@ -193,6 +193,17 @@ test('test_lire_echec_erreur_inattendue', () => {
   assert.deepStrictEqual([r.slug, r.tag, r.raison], ['inconnu', '-', 'boom']);
 });
 
+test('test_rapport_halt_arbre_propre_sans_marqueur_parasite', () => {
+  // n8n retire le saut de ligne final : la sortie se termine par "__STATUS__".
+  const r = executer('rapport-halt', {
+    entree: { stdout: 'a1b2c3 chore(x): restes\n__STATUS__' },
+    noeuds: { 'Lire l\'échec': { slug: 'x', tag: 't', raison: 'r', noeud: 'n', url: 'u', stamp: 's' } },
+  });
+  const md = Buffer.from(r.contenu_b64, 'base64').toString('utf8');
+  assert.doesNotMatch(md, /__STATUS__/);
+  assert.doesNotMatch(md, /Travail non commite/);
+});
+
 test('test_rapport_halt_parse_message_et_liste_commits', () => {
   const r = executer('rapport-halt', {
     entree: { stdout: 'a1b2c3 chore(remise-fidelite): restes du backend-lead avant gates\n__STATUS__\n M server/panier.js\n' },

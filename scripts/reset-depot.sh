@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Recree depot-demo/ a l'identique depuis modele-depot-demo/ et vide journaux/.
+# Recree depot-demo/ a l'identique depuis modele-depot-demo/ (journaux/ est conserve).
 # Usage : scripts/reset-depot.sh [--tache <fichier.md>]
 #   --tache : depose la tache en .agents/queue/task_001.md, NON committee
 #             (committer la declenche via le hook post-commit).
@@ -14,7 +14,6 @@ fi
 # On vide le contenu sans supprimer les dossiers : ils sont montes dans Docker.
 mkdir -p "$depot" "$racine/journaux"
 find "$depot" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-find "$racine/journaux" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
 cp -r "$racine/modele-depot-demo/." "$depot/"
 rm -rf "$depot/taches" "$depot/hooks"

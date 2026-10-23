@@ -2,7 +2,8 @@
 // restauré, le rapport liste ce qui a été conservé et ce qui reste à trancher.
 // Entrée : stdout = commits depuis le tag, "__STATUS__", puis git status.
 const echec = $("Lire l'échec").first().json;
-const [log = '', status = ''] = ($input.first().json.stdout || '').replace(/\r\n/g, '\n').split('__STATUS__\n');
+// n8n retire le saut de ligne final : un arbre propre laisse la sortie finir sur "__STATUS__".
+const [log = '', status = ''] = ($input.first().json.stdout || '').replace(/\r\n/g, '\n').split(/__STATUS__\n?/);
 const commits = log.split('\n').filter((l) => l.trim());
 const residu = status.split('\n').filter((l) => l.trim()).map((l) => l.slice(3).trim());
 

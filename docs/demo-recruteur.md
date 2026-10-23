@@ -11,9 +11,12 @@ Pour montrer Pentacore dans n8n en 5 minutes, en direct ou en partage d'écran.
 4. `bash scripts/recette.sh tout` : les quatre scénarios doivent finir sur
    `== 0 echec(s)`. Cela vérifie que tout marche et remplit l'historique des
    exécutions avec un cycle réussi et des HALT à montrer.
-5. Préparer la tâche du direct, **sans la committer** :
+5. `bash scripts/recette.sh triche-deux-fois` : laisse un rapport de HALT
+   frais dans `journaux/` pour l'étape 4 du déroulé.
+6. Préparer la tâche du direct, **sans la committer** (le reset conserve
+   `journaux/`) :
    `bash scripts/reset-depot.sh --tache modele-depot-demo/taches/remise.md`
-6. Ouvrir trois fenêtres côte à côte :
+7. Ouvrir trois fenêtres côte à côte :
    - n8n, sur le workflow **Pentacore — Cycle (palier 1)** ;
    - un terminal dans `depot-demo/` ;
    - `modele-depot-demo/taches/remise.md`.
@@ -77,10 +80,6 @@ Dans **Executions**, ouvrir une exécution en échec issue de la recette
 (double triche). Puis ouvrir le rapport de HALT dans `journaux/` : raison,
 preuve, commits conservés, tag de restauration. **Rien n'est défait** : c'est
 l'humain qui tranche.
-
-> Si `recette.sh` a été lancé avant, `journaux/` a été vidé au scénario suivant.
-> Pour avoir un rapport à montrer, lancer
-> `bash scripts/recette.sh triche-deux-fois` juste avant la démo.
 
 ### 5. La suite et l'honnêteté (1 min)
 
