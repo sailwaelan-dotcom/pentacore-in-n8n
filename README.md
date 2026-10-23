@@ -132,4 +132,5 @@ $PENTACORE_MODELE`) mais n'est pas encore éprouvé.
 
 - [01 — Carte de Pentacore](docs/01-carte-pentacore.md) : étapes, gates, boucles, état, citées au fichier et à la ligne.
 - [02 — Correspondance Pentacore → n8n](docs/02-correspondance.md) : concept par concept, classé direct / contournement / à perdre, sourcé sur docs.n8n.io.
+- [Déroulé de la démo](docs/demo-recruteur.md) : le script des 5 minutes et les questions probables.
 - [Conception de la V1](docs/superpowers/specs/2026-10-23-pentacore-n8n-v1-design.md) et [plan du palier 1](docs/superpowers/plans/2026-10-23-palier-1-livraison-du-soir.md).
